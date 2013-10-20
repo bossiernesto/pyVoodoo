@@ -1,6 +1,7 @@
 import PyMetabuilder
 import types
 
+
 class InstanceCodeGenerator:
     def get_object_code_builder(self):
         pass
@@ -36,15 +37,15 @@ class ObjectCodeBuilder(PyMetabuilder.MetaBuilder.MetaBuilder):
         return self.to_code_type(instance)
 
     def to_code_type(self, instance):
-        return types.CodeType(instance.co_argcount,\
-            instance.co_nlocals,\
-            instance.co_stacksize,\
-            instance.co_flags,\
-            instance.co_code,\
-            instance.co_consts,\
-            instance.co_names,\
-            instance.co_varnames,\
-            instance.co_filename,\
-            instance.co_name,\
-            instance.co_firstlineno,\
-            instance.co_lnotab)
+        return types.CodeType(instance.co_argcount, \
+                              instance.co_nlocals, \
+                              instance.co_stacksize, \
+                              instance.co_flags, \
+                              instance.co_code, \
+                              instance.co_consts, \
+                              instance.co_names, \
+                              instance.co_varnames, \
+                              instance.co_filename, \
+                              instance.co_name, \
+                              instance.co_firstlineno, \
+                              instance.co_lnotab)

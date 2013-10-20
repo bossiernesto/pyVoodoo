@@ -1,7 +1,7 @@
 import inspect
 
-class Reflector:
 
+class Reflector:
     @staticmethod
     def who_am_i():
         return inspect.stack()[1][3]
