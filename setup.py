@@ -19,7 +19,6 @@ setup(name='PyVoodoo',
       ],
       install_requires=['pyMetaBuilder'],
       package_dir={'PyVoodoo': 'pyVoodoo'},
-      keywords="bytecode",
       classifiers=["Development Status :: 1 - Planning",
                    "Topic :: Utilities",
                    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)"]
