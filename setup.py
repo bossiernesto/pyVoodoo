@@ -17,7 +17,7 @@ setup(name='PyVoodoo',
       data_files=[
           (templates_dir, templates_files)
       ],
-      install_requires=['pyMetaBuilder'],
+      install_requires=[],
       package_dir={'PyVoodoo': 'pyVoodoo'},
       classifiers=["Development Status :: 1 - Planning",
                    "Topic :: Utilities",
