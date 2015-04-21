@@ -31,7 +31,7 @@ class TestOpcodes(unittest.TestCase):
             code = opcode.code()
             name = opcode.opcode_name()
             self.assertIn(code, op.hasname)
-            self.assertEquals(name, op.opname[code])
+            self.assertEqual(name, op.opname[code])
 
     def test_has_jrel(self):
         for opcode in assembler.hasjrel:
@@ -39,7 +39,7 @@ class TestOpcodes(unittest.TestCase):
             name = opcode.opcode_name()
 
             self.assertIn(code, op.hasjrel)
-            self.assertEquals(name, op.opname[code])
+            self.assertEqual(name, op.opname[code])
 
     def test_has_jabs(self):
         for opcode in assembler.hasjabs:
@@ -47,7 +47,7 @@ class TestOpcodes(unittest.TestCase):
             name = opcode.opcode_name()
 
             self.assertIn(code, op.hasjabs)
-            self.assertEquals(name, op.opname[code])
+            self.assertEqual(name, op.opname[code])
 
     def test_has_local(self):
         for opcode in assembler.haslocal:
@@ -55,7 +55,7 @@ class TestOpcodes(unittest.TestCase):
             name = opcode.opcode_name()
 
             self.assertIn(code, op.haslocal)
-            self.assertEquals(name, op.opname[code])
+            self.assertEqual(name, op.opname[code])
 
     def test_has_compare(self):
         for opcode in assembler.hascompare:
@@ -63,7 +63,7 @@ class TestOpcodes(unittest.TestCase):
             name = opcode.opcode_name()
 
             self.assertIn(code, op.hascompare)
-            self.assertEquals(name, op.opname[code])
+            self.assertEqual(name, op.opname[code])
 
     def test_has_free(self):
         for opcode in assembler.hasfree:
@@ -71,5 +71,5 @@ class TestOpcodes(unittest.TestCase):
             name = opcode.opcode_name()
 
             self.assertIn(code, op.hasfree)
-            self.assertEquals(name, op.opname[code])
+            self.assertEqual(name, op.opname[code])
 
