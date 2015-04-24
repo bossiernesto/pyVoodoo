@@ -44,7 +44,6 @@ cmp_op = opcode.cmp_op
 # make ops global
 
 hasnoargs = set(x for x in raw_opmap.values() if x.code() < opcode.HAVE_ARGUMENT)
-
 hasarg = set(x for x in raw_opmap.values() if x.code() >= opcode.HAVE_ARGUMENT)
 hasconst = set(make_opcode(x) for x in opcode.hasconst)
 hasname = set(make_opcode(x) for x in opcode.hasname)
@@ -204,6 +203,9 @@ class Code(object):
         self.stack_history = []
 
         self._ss = 0
+
+    def _code_as_list(self):
+        return list(self.code)
 
     def set_stack_size(self, size):
         if size < 0:  # Check lower boundary
