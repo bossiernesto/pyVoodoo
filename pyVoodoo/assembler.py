@@ -7,7 +7,6 @@ import binascii
 from array import array
 from pyVoodoo.assemblerExceptions import *
 import sys
-from pyVoodoo.ir import with_name
 
 
 def listify(gen):
@@ -43,6 +42,9 @@ make_opcode = lambda code: Opcode((opname[code], code))
 # CMP
 cmp_op = opcode.cmp_op
 # make ops global
+
+hasnoargs = set(x for x in raw_opmap.values() if x.code() < opcode.HAVE_ARGUMENT)
+
 hasarg = set(x for x in raw_opmap.values() if x.code() >= opcode.HAVE_ARGUMENT)
 hasconst = set(make_opcode(x) for x in opcode.hasconst)
 hasname = set(make_opcode(x) for x in opcode.hasname)
@@ -205,7 +207,7 @@ class Code(object):
 
     def set_stack_size(self, size):
         if size < 0:  # Check lower boundary
-            raise AssertionError("Stack underflow")
+            raise AssemblerBytecodeException("Stack underflow")
         if size > self.stacksize:
             self.stacksize = size
         bytes = len(self.code) - len(self.stack_history) + 1
@@ -241,6 +243,9 @@ class Code(object):
                 i += 3
 
     def emit_arg(self, op, arg):
+        if not isinstance(op, int):
+            op = opcode_by_name(op)
+
         emit = self.emit_bytecode
         if arg > 0xFFFF:
             emit(opcode.EXTENDED_ARG)
@@ -271,7 +276,7 @@ class Code(object):
                     break
             pos = arg + 1
             continue
-        return self.emit_arg(opmap['LOAD_CONST'], arg)
+        return self.emit_arg('LOAD_CONST', arg)
 
     def RETURN_VALUE(self):
         self.stackchange((1, 0))
@@ -286,7 +291,7 @@ class Code(object):
             self.STORE_FAST(const_name)
             arg = self.varnames.index(const_name)
 
-        self.emit_arg(opmap['LOAD_FAST'], arg)
+        self.emit_arg('LOAD_FAST', arg)
 
     LOAD_DEREF = LOAD_FAST
 
@@ -309,7 +314,6 @@ class Code(object):
     def stack_unknown(self):
         self._ss = None
 
-
     def __getattr__(self, name):
         def _missing(*args, **kwargs):
             message = "A missing method was called\r\n"
@@ -320,6 +324,29 @@ class Code(object):
         return _missing
 
 
+import types
+
+
+def with_name(f, name):
+    try:
+        f.__name__ = name
+        return f
+    except (TypeError, AttributeError):
+        return types.FunctionType(
+            f.func_code, f.func_globals, name, f.func_defaults, f.func_closure
+        )
+
+
+for name, value in hasnoargs:
+    if not hasattr(Code, name):
+        def threat_noargument(self, opname=name):
+            op = opmap[opname]
+            self.stackchange(tuple(stack_effects[op]))
+            self.emit_bytecode(op)
+
+        setattr(Code, name, threat_noargument)
+
+
 class _se(object):
     """Quick way of defining static stack effects of opcodes"""
     POP_TOP = END_FINALLY = POP_JUMP_IF_FALSE = POP_JUMP_IF_TRUE = 1, 0
@@ -327,6 +354,7 @@ class _se(object):
     ROT_THREE = 3, 3
     ROT_FOUR = 4, 4
     DUP_TOP = 1, 2
+    DUP_TOP_TWO = 2, 4
     UNARY_POSITIVE = UNARY_NEGATIVE = UNARY_NOT = UNARY_CONVERT = \
         UNARY_INVERT = GET_ITER = LOAD_ATTR = IMPORT_FROM = 1, 1
 

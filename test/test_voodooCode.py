@@ -77,6 +77,40 @@ class CodeTest(TestCase):
         self.assertEqual(('a',), load_and_return.__code__.co_varnames)
         self.assertEqual(list(expected), list(self.code.code))
 
+    def test_error_stack_underflow(self):
+        from pyVoodoo import AssemblerBytecodeException
+
+        self.assertRaises(AssemblerBytecodeException, self.code.DUP_TOP)
+
+    def test_top_opcodes(self):
+        self.code.LOAD_CONST(1)
+        self.code.DUP_TOP()
+        self.code.DUP_TOP()
+
+        self.assertEqual([100, 1, 0, 4, 4], list(self.code.code))
+        self.assertEqual(3, self.code.stack_size)
+
+    def test_unary_index_lookup(self):
+        self.code.LOAD_CONST(1)
+        for i in range(3):
+            self.code.DUP_TOP()
+
+        self.assertEqual(3, self.code.find_first_opcode_index(4))
+        self.assertEqual([3, 4, 5], self.code.find_opcode_index(4))
+
+    def test_duptwo_error_opcode(self):
+        from pyVoodoo import AssemblerBytecodeException
+        self.code.LOAD_CONST(1)
+
+        self.assertRaises(AssemblerBytecodeException, self.code.DUP_TOP_TWO)
+
+    def test_duptwo_valid(self):
+        self.code.LOAD_CONST(1456)
+        self.code.LOAD_CONST(134)
+        self.code.DUP_TOP_TWO()
+
+        self.assertEqual(4, self.code.stack_size)
+        self.assertEqual([100, 1, 0, 100, 2, 0, 5], list(self.code.code))
 
     # Find Instruction tests
     def test_missing_method(self):
