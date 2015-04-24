@@ -99,6 +99,23 @@ class CodeTest(TestCase):
         self.assertEqual(3, self.code.find_first_opcode_index(4))
         self.assertEqual([3, 4, 5], self.code.find_opcode_index(4))
 
+    def test_generation_not_unary_pop_top(self):
+        self.code.LOAD_CONST(1)
+        self.code.STORE_FAST('a')
+        self.code.LOAD_FAST('a')
+        self.assertEqual(1, self.code.stack_size)
+        self.code.UNARY_NOT()
+        self.code.POP_TOP()
+        self.assertEqual(0, self.code.stack_size)
+        self.code.LOAD_CONST(None)
+        self.assertEqual(1, self.code.stack_size)
+        self.code.RETURN_VALUE()
+
+        expected = not_and_pop.__code__
+        self.assertEqual(expected.co_code, bytes(self.code._code_as_list()))
+        self.assertEqual(expected.co_varnames, tuple(self.code.varnames))
+        self.assertEqual(expected.co_consts, tuple(self.code.consts))
+
     # Find Instruction tests
     def test_missing_method(self):
         self.assertRaises(AssemblerBytecodeException, self.code.missingmethodcalled)
@@ -134,10 +151,10 @@ class CodeTest(TestCase):
         self.assertRaises(InexistentInstruction, opcode_by_name, 'STOR_FAST')
 
     # Opcode testing
-    def test_POP_TOP_failure_instruction(self):  #1
+    def test_POP_TOP_failure_instruction(self):  # 1
         self.assertRaises(AssemblerBytecodeException, self.code.POP_TOP)
 
-    def test_POP_TOP_instruction(self):  #1
+    def test_POP_TOP_instruction(self):  # 1
         self.code.LOAD_CONST(514)
         self.assertEqual(1, self.code.stack_size)
         self.assertEqual([100, 1, 0], self.code._code_as_list())
@@ -147,11 +164,11 @@ class CodeTest(TestCase):
         self.assertEqual([100, 1, 0, 1], self.code._code_as_list())
         self.assertEqual([0, 1, 1, 1], self.code.stack_history)
 
-    def test_ROT_TWO_failure(self):  #2
+    def test_ROT_TWO_failure(self):  # 2
         self.code.LOAD_CONST(4242)
         self.assertRaises(AssemblerBytecodeException, self.code.ROT_TWO)
 
-    def test_ROT_TWO_instruction(self):  #2
+    def test_ROT_TWO_instruction(self):  # 2
         self.code.LOAD_CONST(3442)
         self.code.LOAD_CONST(2211)
         self.assertEqual([100, 1, 0, 100, 2, 0], self.code._code_as_list())
@@ -161,12 +178,12 @@ class CodeTest(TestCase):
         self.assertEqual([100, 1, 0, 100, 2, 0, 2], self.code._code_as_list())
         self.assertEqual([None, 3442, 2211], self.code.consts)
 
-    def test_ROT_THREE_failure(self):  #3
+    def test_ROT_THREE_failure(self):  # 3
         self.code.LOAD_CONST(4242)
         self.code.LOAD_CONST(2211)
         self.assertRaises(AssemblerBytecodeException, self.code.ROT_THREE)
 
-    def test_ROT_THREE_instruction(self):  #3
+    def test_ROT_THREE_instruction(self):  # 3
         self.code.LOAD_CONST(3442)
         self.code.LOAD_CONST(2211)
         self.code.LOAD_CONST(1)
@@ -177,13 +194,13 @@ class CodeTest(TestCase):
         self.assertEqual([100, 1, 0, 100, 2, 0, 100, 3, 0, 3], self.code._code_as_list())
         self.assertEqual([None, 3442, 2211, 1], self.code.consts)
 
-    def test_DUP_TOP_error_instruction(self):  #4
+    def test_DUP_TOP_error_instruction(self):  # 4
 
         self.code.LOAD_CONST(1)
 
         self.assertRaises(AssemblerBytecodeException, self.code.DUP_TOP_TWO)
 
-    def test_DUP_TOP_instruction(self):  #4
+    def test_DUP_TOP_instruction(self):  # 4
         self.code.LOAD_CONST(1456)
         self.code.LOAD_CONST(134)
         self.code.DUP_TOP_TWO()
@@ -191,11 +208,11 @@ class CodeTest(TestCase):
         self.assertEqual(4, self.code.stack_size)
         self.assertEqual([100, 1, 0, 100, 2, 0, 5], self.code._code_as_list())
 
-    def test_DUP_TOP_TWO_failure(self):#5
+    def test_DUP_TOP_TWO_failure(self):  # 5
         self.code.LOAD_CONST(23425)
         self.assertRaises(AssemblerBytecodeException, self.code.DUP_TOP_TWO)
 
-    def test_DUP_TOP_TWO_instruction(self):#5
+    def test_DUP_TOP_TWO_instruction(self):  # 5
         self.code.LOAD_CONST(341)
         self.code.LOAD_CONST(4828)
         self.code.DUP_TOP_TWO()
@@ -203,16 +220,16 @@ class CodeTest(TestCase):
         self.assertEqual(4, self.code.stack_size)
         self.assertEqual([None, 341, 4828], self.code.consts)
 
-    def test_NOP_opcode(self): #9
+    def test_NOP_opcode(self):  # 9
         self.code.NOP()
         self.assertEqual([9], list(self.code.code))
         self.assertEqual(0, self.code.stack_size)
 
-    def test_UNARY_POSITIVE_failure(self):#10
+    def test_UNARY_POSITIVE_failure(self):  # 10
         #TOS = +TOS
         self.assertRaises(AssemblerBytecodeException, self.code.UNARY_POSITIVE)
 
-    def test_UNARY_POSITIVE_instruction(self):#10
+    def test_UNARY_POSITIVE_instruction(self):  # 10
         self.code.LOAD_CONST(-144)
         self.code.UNARY_POSITIVE()
 
@@ -220,11 +237,11 @@ class CodeTest(TestCase):
         self.assertEqual(1, self.code.stack_size)
         self.assertEqual([None, -144], self.code.consts)
 
-    def tets_UNARY_NEGATIVE_failure(self):#11
+    def tets_UNARY_NEGATIVE_failure(self):  # 11
         #TOS = -TOS
         self.assertRaises(AssemblerBytecodeException, self.code.UNARY_NEGATIVE)
 
-    def test_UNARY_NEGATIVE_instruction(self):#11
+    def test_UNARY_NEGATIVE_instruction(self):  # 11
         self.code.LOAD_CONST(1344)
         self.code.UNARY_NEGATIVE()
 
@@ -232,11 +249,11 @@ class CodeTest(TestCase):
         self.assertEqual(1, self.code.stack_size)
         self.assertEqual([None, 1344], self.code.consts)
 
-    def test_UNARY_NOT_failure(self):#12
+    def test_UNARY_NOT_failure(self):  # 12
         #TOS = not TOS
         self.assertRaises(AssemblerBytecodeException, self.code.UNARY_NOT)
 
-    def test_UNARY_NOT_instruction(self):#12
+    def test_UNARY_NOT_instruction(self):  # 12
         self.code.LOAD_CONST(146)
         self.code.UNARY_NOT()
 
@@ -244,11 +261,11 @@ class CodeTest(TestCase):
         self.assertEqual(1, self.code.stack_size)
         self.assertEqual([None, 146], self.code.consts)
 
-    def test_UNARY_INVERT_failure(self):#15
+    def test_UNARY_INVERT_failure(self):  # 15
         #TOS = ~TOS
         self.assertRaises(AssemblerBytecodeException, self.code.UNARY_INVERT)
 
-    def test_UNARY_INVERT_instruction(self):#15
+    def test_UNARY_INVERT_instruction(self):  # 15
         self.code.LOAD_CONST(1)
         self.code.UNARY_INVERT()
 
@@ -256,4 +273,4 @@ class CodeTest(TestCase):
         self.assertEqual(1, self.code.stack_size)
         self.assertEqual([None, 1], self.code.consts)
 
-    #TODO: continue on instr. BINARY_POWER -> 19
+        #TODO: continue on instr. BINARY_POWER -> 19

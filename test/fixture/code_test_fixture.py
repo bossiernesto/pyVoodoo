@@ -5,3 +5,8 @@ def test_function():
 def load_and_return():
     a = 1
     return a
+
+
+def not_and_pop():
+    a = 1
+    not a
