@@ -1,10 +1,13 @@
 import opcode
-from _io import StringIO
 from collections import OrderedDict
 import dis
 import types
 import marshal
 import binascii
+from array import array
+from pyVoodoo.assemblerExceptions import *
+import sys
+from pyVoodoo.ir import with_name
 
 
 class Opcode(tuple):
@@ -21,8 +24,8 @@ class Opcode(tuple):
 
 
 raw_opmap = dict((name.replace('+', '_'), Opcode((name, code)))
-             for name, code in opcode.opmap.items()
-             if name != 'EXTENDED_ARG')
+                 for name, code in opcode.opmap.items()
+                 if name != 'EXTENDED_ARG')
 opmap = OrderedDict(sorted(raw_opmap.values()))
 opname = dict((code, name) for name, code in opmap.items())
 opcodes = set(opname)
@@ -30,7 +33,7 @@ make_opcode = lambda code: Opcode((opname[code], code))
 
 # CMP
 cmp_op = opcode.cmp_op
-#make ops global
+# make ops global
 hasarg = set(x for x in raw_opmap.values() if x.code() >= opcode.HAVE_ARGUMENT)
 hasconst = set(make_opcode(x) for x in opcode.hasconst)
 hasname = set(make_opcode(x) for x in opcode.hasname)
@@ -62,10 +65,6 @@ CO_NOFREE = 0x0064  # set if no free or cell vars
 CO_GENERATOR_ALLOWED = 0x0128  # unused
 
 
-class PersistorException(Exception):
-    pass
-
-
 class Persistor(object):
     def to_code_type(self, instance):
         if not isinstance(instance, Code):
@@ -84,12 +83,7 @@ class Persistor(object):
                               instance.co_lnotab)
 
 
-class AssemblerBytecodeException(Exception):
-    pass
-
-
 class PythonCodeDumper(object):
-
     def dump(self, code_object, indent=''):
         print("%scode" % indent)
         indent += '   '
@@ -102,7 +96,7 @@ class PythonCodeDumper(object):
         print("%sconsts" % indent)
         for const in code_object.co_consts:
             if type(const) == types.CodeType:
-                self.dump(const, indent+'   ')
+                self.dump(const, indent + '   ')
             else:
                 print("   %s%r" % (indent, const))
         print("%snames %r" % (indent, code_object.co_names))
@@ -121,12 +115,13 @@ class PythonCodeDumper(object):
         else:
             print("%s%s" % (indent, label))
             for i in range(0, len(h), 60):
-                print("%s   %s" % (indent, h[i:i+60]))
+                print("%s   %s" % (indent, h[i:i + 60]))
+
 
 class PythonParser(object):
-
     def _parse_from_py(self, file, debug=True):
         import py_compile
+
         fd = py_compile.compile(file)
         return self._parse_from_pyc(fd, debug)
 
@@ -140,7 +135,7 @@ class PythonParser(object):
             try:
                 code = marshal.load(fd)
                 fd.close()
-            #Add a comment to this line
+            # Add a comment to this line
             except ValueError:
                 fd.seek(0)
                 fd.read(8)  # skip magic & date & file size; file size added in Python 3.3
@@ -170,8 +165,187 @@ class PythonParser(object):
         pass
 
 
+class Code(object):
+    def __init__(self):
+        self.argcount = 0
+        self.stacksize = 0
+        self.flags = CO_OPTIMIZED | CO_NEWLOCALS
+        self.filename = '<generated code>'
+        self.name = '<lambda>'
+        self.firstlineno = 0
+        self.freevars = ()
+        self.cellvars = ()
+        self.code = array('B')
+        self.consts = [None]
+        self.names = []
+        self.varnames = []
+        self.lnotab = array('B')
+        self.stack_size = 0
 
-class Code:
-    pass
+        self.emit_bytecode = self.code.append
+        self.blocks = []
+        self.stack_history = []
+
+        self._ss = 0
+
+    def to_bytecode_string(self):
+        return bytes(self.code)
+
+    def find_opcode_index(self, opcodes, op):
+        _op = op
+        if not isinstance(op, int):
+            _op = opmap[op]
+        i = 0
+        while i < len(opcodes):
+            if opcodes[i] == _op:
+                return i
+            if opcodes[i] < opcode.HAVE_ARGUMENT:  # 90, as mentioned earlier
+                i += 1
+            else:
+                i += 3
+        raise InstructionNotFoundException
+
+    def emit_arg(self, op, arg):
+        emit = self.emit_bytecode
+        if arg > 0xFFFF:
+            emit(opcode.EXTENDED_ARG)
+            emit((arg >> 16) & 255)
+            emit((arg >> 24) & 255)
+        emit(op)
+        emit(arg & 255)
+        emit((arg >> 8) & 255)
+
+    def LOAD_CONST(self, const):
+        self.stackchange((0, 1))
+        pos = 0
+        hashable = True
+        try:
+            hash(const)
+        except TypeError:
+            hashable = False
+        while 1:
+            try:
+                arg = self.consts.index(const, pos)
+                it = self.consts[arg]
+            except ValueError:
+                arg = len(self.consts)
+                self.consts.append(const)
+                break
+            else:
+                if type(it) is type(const) and (hashable or it is const):
+                    break
+            pos = arg + 1
+            continue
+        return self.emit_arg(opmap['LOAD_CONST'], arg)
+
+    def RETURN_VALUE(self):
+        self.stackchange((1, 0))
+        self.emit_bytecode(opmap['RETURN_VALUE'])
+        self.stack_unknown()
+
+    def LOAD_FAST(self, const_name):
+        self.stackchange(tuple(_se.LOAD_FAST))
+        try:
+            arg = self.varnames.index(const_name)
+        except ValueError:
+            arg = len(self.varnames)
+            self.varnames.append(const_name)
+
+        self.emit_arg(opmap['LOAD_FAST'], arg)
+
+    LOAD_DEREF = LOAD_FAST
+
+    def STORE_FAST(self, const_name):
+        self.stackchange(tuple(_se.STORE_FAST))
+        try:
+            arg = self.varnames.index(const_name)
+        except ValueError:
+            arg = len(self.varnames)
+            self.varnames.append(const_name)
+        self.emit_arg(opmap['STORE_FAST'], arg)
+
+    def stackchange(self, *tuple_mod):
+        (inputs, outputs) = tuple_mod[0]
+        if self._ss is None:
+            raise AssertionError("Unknown stack size at this location")
+        self.stack_size -= inputs
+        self.stack_size += outputs
+
+    def stack_unknown(self):
+        self._ss = None
 
 
+    def __getattr__(self, name):
+        def _missing(*args, **kwargs):
+            print("A missing method was called.")
+            print("The object was %r, the method was %r. ") % (self, name)
+            print("It was called with %r and %r as arguments") % (args, kwargs)
+        return _missing
+
+class _se(object):
+    """Quick way of defining static stack effects of opcodes"""
+    POP_TOP = END_FINALLY = POP_JUMP_IF_FALSE = POP_JUMP_IF_TRUE = 1, 0
+    ROT_TWO = 2, 2
+    ROT_THREE = 3, 3
+    ROT_FOUR = 4, 4
+    DUP_TOP = 1, 2
+    UNARY_POSITIVE = UNARY_NEGATIVE = UNARY_NOT = UNARY_CONVERT = \
+        UNARY_INVERT = GET_ITER = LOAD_ATTR = IMPORT_FROM = 1, 1
+
+    BINARY_POWER = BINARY_MULTIPLY = BINARY_DIVIDE = BINARY_FLOOR_DIVIDE = \
+        BINARY_TRUE_DIVIDE = BINARY_MODULO = BINARY_ADD = BINARY_SUBTRACT = \
+        BINARY_SUBSCR = BINARY_LSHIFT = BINARY_RSHIFT = BINARY_AND = \
+        BINARY_XOR = BINARY_OR = COMPARE_OP = 2, 1
+
+    INPLACE_POWER = INPLACE_MULTIPLY = INPLACE_DIVIDE = \
+        INPLACE_FLOOR_DIVIDE = INPLACE_TRUE_DIVIDE = INPLACE_MODULO = \
+        INPLACE_ADD = INPLACE_SUBTRACT = INPLACE_LSHIFT = INPLACE_RSHIFT = \
+        INPLACE_AND = INPLACE_XOR = INPLACE_OR = 2, 1
+
+    SLICE_0, SLICE_1, SLICE_2, SLICE_3 = \
+        (1, 1), (2, 1), (2, 1), (3, 1)
+    STORE_SLICE_0, STORE_SLICE_1, STORE_SLICE_2, STORE_SLICE_3 = \
+        (2, 0), (3, 0), (3, 0), (4, 0)
+    DELETE_SLICE_0, DELETE_SLICE_1, DELETE_SLICE_2, DELETE_SLICE_3 = \
+        (1, 0), (2, 0), (2, 0), (3, 0)
+
+    STORE_SUBSCR = 3, 0
+    DELETE_SUBSCR = STORE_ATTR = 2, 0
+    DELETE_ATTR = STORE_DEREF = 1, 0
+    PRINT_EXPR = PRINT_ITEM = PRINT_NEWLINE_TO = IMPORT_STAR = 1, 0
+    RETURN_VALUE = YIELD_VALUE = STORE_NAME = STORE_GLOBAL = STORE_FAST = 1, 0
+    PRINT_ITEM_TO = LIST_APPEND = 2, 0
+
+    LOAD_LOCALS = LOAD_CONST = LOAD_NAME = LOAD_GLOBAL = LOAD_FAST = \
+        LOAD_CLOSURE = LOAD_DEREF = IMPORT_NAME = BUILD_MAP = 0, 1
+
+    EXEC_STMT = BUILD_CLASS = 3, 0
+    JUMP_IF_TRUE = JUMP_IF_FALSE = \
+        JUMP_IF_TRUE_OR_POP = JUMP_IF_FALSE_OR_POP = 1, 1
+
+
+if sys.version >= "2.5":
+    _se.YIELD_VALUE = 1, 1
+
+stack_effects = [(0, 0)] * 256
+
+for name in opname.values():
+    op = opmap[name]
+    name = name.replace('+', '_')
+
+    if hasattr(_se, name):
+        # update stack effects table from the _se class
+        stack_effects[op] = getattr(_se, name)
+
+    if not hasattr(Code, name):
+        # Create default method for Code class
+        if op >= opcode.HAVE_ARGUMENT:
+            def do_op(self, arg, op=op, se=stack_effects[op]):
+                self.stackchange(se);
+                self.emit_arg(op, arg)
+        else:
+            def do_op(self, op=op, se=stack_effects[op]):
+                self.stackchange(se);
+                self.emit(op)
+
+        setattr(Code, name, with_name(do_op, name))
