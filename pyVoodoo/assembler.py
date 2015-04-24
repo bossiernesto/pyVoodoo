@@ -10,6 +10,15 @@ import sys
 from pyVoodoo.ir import with_name
 
 
+def listify(gen):
+    "Convert a generator into a function which returns a list"
+
+    def patched(*args, **kwargs):
+        return list(gen(*args, **kwargs))
+
+    return patched
+
+
 class Opcode(tuple):
     """An int which represents an opcode - has a nicer repr."""
 
@@ -63,6 +72,13 @@ CO_NESTED = 0x0016  # ???
 CO_GENERATOR = 0x0032
 CO_NOFREE = 0x0064  # set if no free or cell vars
 CO_GENERATOR_ALLOWED = 0x0128  # unused
+
+
+def opcode_by_name(name):
+    try:
+        return opmap[name]
+    except KeyError as e:
+        raise InexistentInstruction(e)
 
 
 class Persistor(object):
@@ -134,7 +150,6 @@ class PythonParser(object):
             modtime = time.asctime(time.localtime(struct.unpack('I', moddate)[0]))
             try:
                 code = marshal.load(fd)
-                fd.close()
             # Add a comment to this line
             except ValueError:
                 fd.seek(0)
@@ -180,7 +195,7 @@ class Code(object):
         self.names = []
         self.varnames = []
         self.lnotab = array('B')
-        self.stack_size = 0
+        self.stacksize = 0
 
         self.emit_bytecode = self.code.append
         self.blocks = []
@@ -188,22 +203,42 @@ class Code(object):
 
         self._ss = 0
 
+    def set_stack_size(self, size):
+        if size < 0:  # Check lower boundary
+            raise AssertionError("Stack underflow")
+        if size > self.stacksize:
+            self.stacksize = size
+        bytes = len(self.code) - len(self.stack_history) + 1
+        if bytes > 0:
+            self.stack_history.extend([self._ss] * bytes)
+        self._ss = size
+
+    def get_stack_size(self):
+        return self._ss
+
+    stack_size = property(get_stack_size, set_stack_size)
+
     def to_bytecode_string(self):
         return bytes(self.code)
 
-    def find_opcode_index(self, opcodes, op):
+    def find_first_opcode_index(self, op):
+        results = self.find_opcode_index(op)
+        return results[0]
+
+    @listify
+    def find_opcode_index(self, op):
         _op = op
         if not isinstance(op, int):
-            _op = opmap[op]
+            _op = opcode_by_name(op)
+
         i = 0
-        while i < len(opcodes):
-            if opcodes[i] == _op:
-                return i
-            if opcodes[i] < opcode.HAVE_ARGUMENT:  # 90, as mentioned earlier
+        while i < len(self.code):
+            if self.code[i] == _op:
+                yield i
+            if self.code[i] < opcode.HAVE_ARGUMENT:  # 90, as mentioned earlier
                 i += 1
             else:
                 i += 3
-        raise InstructionNotFoundException
 
     def emit_arg(self, op, arg):
         emit = self.emit_bytecode
@@ -248,8 +283,8 @@ class Code(object):
         try:
             arg = self.varnames.index(const_name)
         except ValueError:
-            arg = len(self.varnames)
-            self.varnames.append(const_name)
+            self.STORE_FAST(const_name)
+            arg = self.varnames.index(const_name)
 
         self.emit_arg(opmap['LOAD_FAST'], arg)
 
@@ -277,10 +312,13 @@ class Code(object):
 
     def __getattr__(self, name):
         def _missing(*args, **kwargs):
-            print("A missing method was called.")
-            print("The object was %r, the method was %r. ") % (self, name)
-            print("It was called with %r and %r as arguments") % (args, kwargs)
+            message = "A missing method was called\r\n"
+            message += "The object was {0}, the method was {1} \r\n".format(self, name)
+            message += "It was called with {0} and {1} as arguments\r\n".format(args, kwargs)
+            raise AssemblerBytecodeException(message)
+
         return _missing
+
 
 class _se(object):
     """Quick way of defining static stack effects of opcodes"""

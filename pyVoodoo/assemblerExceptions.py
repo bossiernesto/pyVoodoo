@@ -7,3 +7,6 @@ class InstructionNotFoundException(AssemblerBytecodeException):
 
 class PersistorException(Exception):
     pass
+
+class InexistentInstruction(AssemblerBytecodeException):
+    pass
