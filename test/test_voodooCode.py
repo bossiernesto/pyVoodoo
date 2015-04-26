@@ -226,7 +226,7 @@ class CodeTest(TestCase):
         self.assertEqual(0, self.code.stack_size)
 
     def test_UNARY_POSITIVE_failure(self):  # 10
-        #TOS = +TOS
+        # TOS = +TOS
         self.assertRaises(AssemblerBytecodeException, self.code.UNARY_POSITIVE)
 
     def test_UNARY_POSITIVE_instruction(self):  # 10
@@ -238,7 +238,7 @@ class CodeTest(TestCase):
         self.assertEqual([None, -144], self.code.consts)
 
     def tets_UNARY_NEGATIVE_failure(self):  # 11
-        #TOS = -TOS
+        # TOS = -TOS
         self.assertRaises(AssemblerBytecodeException, self.code.UNARY_NEGATIVE)
 
     def test_UNARY_NEGATIVE_instruction(self):  # 11
@@ -250,7 +250,7 @@ class CodeTest(TestCase):
         self.assertEqual([None, 1344], self.code.consts)
 
     def test_UNARY_NOT_failure(self):  # 12
-        #TOS = not TOS
+        # TOS = not TOS
         self.assertRaises(AssemblerBytecodeException, self.code.UNARY_NOT)
 
     def test_UNARY_NOT_instruction(self):  # 12
@@ -262,7 +262,7 @@ class CodeTest(TestCase):
         self.assertEqual([None, 146], self.code.consts)
 
     def test_UNARY_INVERT_failure(self):  # 15
-        #TOS = ~TOS
+        # TOS = ~TOS
         self.assertRaises(AssemblerBytecodeException, self.code.UNARY_INVERT)
 
     def test_UNARY_INVERT_instruction(self):  # 15
@@ -273,4 +273,148 @@ class CodeTest(TestCase):
         self.assertEqual(1, self.code.stack_size)
         self.assertEqual([None, 1], self.code.consts)
 
-        #TODO: continue on instr. BINARY_POWER -> 19
+
+    def test_BINARY_POWER_failure(self):
+        self.assertRaises(AssemblerBytecodeException, self.code.BINARY_POWER)
+
+    def test_BINARY_POWER_instruction(self):
+        self.code.LOAD_CONST(123)
+        self.code.LOAD_CONST(1)
+        self.code.BINARY_POWER()
+
+        self.assertEqual([100, 1, 0, 100, 2, 0, 19], self.code._code_as_list())
+        self.assertEqual(1, self.code.stack_size)
+        self.assertEqual([None, 123, 1], self.code.consts)
+
+    def test_BINARY_MULTIPLY_failure(self):
+        self.code.LOAD_CONST(1)
+        self.assertRaises(AssemblerBytecodeException, self.code.BINARY_MULTIPLY)
+
+    def test_BINARY_MULTIPLY_test(self):
+        self.code.LOAD_CONST(1)
+        self.code.LOAD_CONST(23)
+        self.code.BINARY_MULTIPLY()
+
+        self.assertEqual([100, 1, 0, 100, 2, 0, 20], self.code._code_as_list())
+        self.assertEqual(1, self.code.stack_size)
+        self.assertEqual([None, 1, 23], self.code.consts)
+
+    def test_BINARY_MODULO_failure(self):
+        self.code.LOAD_CONST(67)
+        self.assertRaises(AssemblerBytecodeException, self.code.BINARY_MODULO)
+
+
+    def test_BINARY_MODULO_instruction(self):
+        self.code.LOAD_CONST(17)
+        self.code.LOAD_CONST(53)
+        self.code.BINARY_MODULO()
+
+        self.assertEqual([100, 1, 0, 100, 2, 0, 22], self.code._code_as_list())
+        self.assertEqual(1, self.code.stack_size)
+        self.assertEqual([None, 17, 53], self.code.consts)
+
+
+    def test_BINARY_ADD_failure(self):
+        self.code.LOAD_CONST(84)
+        self.assertRaises(AssemblerBytecodeException, self.code.BINARY_ADD)
+
+    def test_BINARY_ADD_instruction(self):
+        self.code.LOAD_CONST(27)
+        self.code.LOAD_CONST(2)
+        self.code.BINARY_ADD()
+
+        self.assertEqual([100, 1, 0, 100, 2, 0, 23], self.code._code_as_list())
+        self.assertEqual(1, self.code.stack_size)
+        self.assertEqual([None, 27, 2], self.code.consts)
+
+    def test_BINARY_SUBTRACT_failure(self):
+        self.assertRaises(AssemblerBytecodeException, self.code.BINARY_SUBTRACT)
+
+    def test_BINARY_SUBTRACT_instruction(self):
+        self.code.LOAD_CONST(3451)
+        self.code.LOAD_CONST(8)
+        self.code.BINARY_SUBTRACT()
+
+        self.assertEqual([100, 1, 0, 100, 2, 0, 24], self.code._code_as_list())
+        self.assertEqual(1, self.code.stack_size)
+        self.assertEqual([None, 3451, 8], self.code.consts)
+
+    def test_BINARY_SUBSCR_failure(self):
+        self.assertRaises(AssemblerBytecodeException, self.code.BINARY_SUBSCR)
+
+    def test_BINARY_SUBSCR_instruction(self):
+        self.code.LOAD_CONST(1)
+        self.code.LOAD_CONST(2)
+        self.code.BINARY_SUBSCR()
+
+        self.assertEqual([100, 1, 0, 100, 2, 0, 25], self.code._code_as_list())
+        self.assertEqual(1, self.code.stack_size)
+        self.assertEqual([None, 1, 2], self.code.consts)
+
+    def test_BINARY_FLOOR_DIVIDE_failure(self):
+        self.code.LOAD_CONST(14)
+        self.assertRaises(AssemblerBytecodeException, self.code.BINARY_FLOOR_DIVIDE)
+
+    def test_BINARY_FLOOR_DIVIDE_instruction(self):
+        self.code.LOAD_CONST(34)
+        self.code.LOAD_CONST(2)
+        self.code.BINARY_FLOOR_DIVIDE()
+
+        self.assertEqual([100, 1, 0, 100, 2, 0, 26], self.code._code_as_list())
+        self.assertEqual(1, self.code.stack_size)
+        self.assertEqual([None, 34, 2], self.code.consts)
+
+    def test_BINARY_TRUE_DIVIDE_failure(self):
+        self.code.LOAD_CONST(2)
+        self.assertRaises(AssemblerBytecodeException, self.code.BINARY_TRUE_DIVIDE)
+
+    def test_BINARY_TRUE_DIVIDE_instruction(self):
+        self.code.LOAD_CONST(1)
+        self.code.LOAD_CONST(2)
+        self.code.BINARY_TRUE_DIVIDE()
+
+        self.assertEqual([100, 1, 0, 100, 2, 0, 27], self.code._code_as_list())
+        self.assertEqual(1, self.code.stack_size)
+        self.assertEqual([None, 1, 2], self.code.consts)
+
+    def test_INPLACE_FLOOR_DIVIDE_failure(self):
+        self.assertRaises(AssemblerBytecodeException, self.code.INPLACE_FLOOR_DIVIDE)
+
+    def test_INPLACE_FLOOR_DIVIDE_instruction(self):
+        self.code.LOAD_CONST(1)
+        self.code.LOAD_CONST(34)
+        self.code.INPLACE_FLOOR_DIVIDE()
+
+        self.assertEqual([100, 1, 0, 100, 2, 0, 28], self.code._code_as_list())
+        self.assertEqual(1, self.code.stack_size)
+        self.assertEqual([None, 1, 34], self.code.consts)
+
+    def test_INPLACE_TRUE_DIVIDE_failure(self):
+        self.code.LOAD_CONST(13)
+        self.assertRaises(AssemblerBytecodeException, self.code.INPLACE_TRUE_DIVIDE)
+
+    def test_INPLACE_TRUE_DIVIDE_instruction(self):
+        self.code.LOAD_CONST(34)
+        self.code.LOAD_CONST(1)
+        self.code.INPLACE_TRUE_DIVIDE()
+
+        self.assertEqual([100, 1, 0, 100, 2, 0, 29], self.code._code_as_list())
+        self.assertEqual(1, self.code.stack_size)
+        self.assertEqual([None, 34, 1], self.code.consts)
+
+    #TODO: STORE_MAP 59
+
+    def test_STORE_SUBSCR_failure(self):
+        self.code.LOAD_CONST(1)
+        self.assertRaises(AssemblerBytecodeException, self.code.STORE_SUBSCR)
+
+    def test_STORE_SUBSCR_instruction(self):
+        self.code.LOAD_CONST(1)
+        self.code.LOAD_CONST(23)
+        self.code.LOAD_CONST(2)
+        self.code.STORE_SUBSCR()
+
+        self.assertEqual([100, 1, 0, 100, 2, 0, 100, 3, 0, 60], self.code._code_as_list())
+        self.assertEqual(0, self.code.stack_size)
+        self.assertEqual([None, 1, 23, 2], self.code.consts)
+
