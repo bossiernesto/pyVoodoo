@@ -1,12 +1,12 @@
 import opcode
 from collections import OrderedDict
 import dis
-import types
 import marshal
 import binascii
 from array import array
 from pyVoodoo.assemblerExceptions import *
 import sys
+import types
 
 
 def listify(gen):
@@ -43,7 +43,7 @@ make_opcode = lambda code: Opcode((opname[code], code))
 cmp_op = opcode.cmp_op
 # make ops global
 
-hasnoargs = set(x for x in raw_opmap.values() if x.code() < opcode.HAVE_ARGUMENT)
+hasnoargs = set(x for x in sorted(raw_opmap.values()) if x.code() < opcode.HAVE_ARGUMENT)
 hasarg = set(x for x in raw_opmap.values() if x.code() >= opcode.HAVE_ARGUMENT)
 hasconst = set(make_opcode(x) for x in opcode.hasconst)
 hasname = set(make_opcode(x) for x in opcode.hasname)
@@ -325,10 +325,6 @@ class Code(object):
 
         return _missing
 
-
-import types
-
-
 def with_name(f, name):
     try:
         f.__name__ = name
@@ -337,7 +333,6 @@ def with_name(f, name):
         return types.FunctionType(
             f.func_code, f.func_globals, name, f.func_defaults, f.func_closure
         )
-
 
 for name, value in hasnoargs:
     if not hasattr(Code, name):
@@ -417,3 +412,5 @@ for name in opname.values():
                 self.emit(op)
 
         setattr(Code, name, with_name(do_op, name))
+
+#TODO: PRINT_EXPR should be separated in a separate method, the syntax should be handled in other way different

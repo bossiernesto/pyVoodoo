@@ -79,8 +79,6 @@ class CodeTest(TestCase):
         self.assertEqual(list(expected), list(self.code.code))
 
     def test_error_stack_underflow(self):
-
-
         self.assertRaises(AssemblerBytecodeException, self.code.DUP_TOP)
 
     def test_top_opcodes(self):
@@ -402,7 +400,7 @@ class CodeTest(TestCase):
         self.assertEqual(1, self.code.stack_size)
         self.assertEqual([None, 34, 1], self.code.consts)
 
-    #TODO: STORE_MAP 59
+    # TODO: STORE_MAP 59
 
     def test_STORE_SUBSCR_failure(self):
         self.code.LOAD_CONST(1)
@@ -417,4 +415,99 @@ class CodeTest(TestCase):
         self.assertEqual([100, 1, 0, 100, 2, 0, 100, 3, 0, 60], self.code._code_as_list())
         self.assertEqual(0, self.code.stack_size)
         self.assertEqual([None, 1, 23, 2], self.code.consts)
+
+    def test_DELETE_SUBSCR_failure(self):
+        self.code.LOAD_CONST(1)
+        self.assertRaises(AssemblerBytecodeException, self.code.DELETE_SUBSCR)
+
+    def test_DELETE_SUBSCR_instruccion(self):
+        self.code.LOAD_CONST(1)
+        self.code.LOAD_CONST(23)
+        self.code.LOAD_CONST(3)
+        self.code.DELETE_SUBSCR()
+
+        self.assertEqual([100, 1, 0, 100, 2, 0, 100, 3, 0, 61], self.code._code_as_list())
+        self.assertEqual(1, self.code.stack_size)
+        self.assertEqual([None, 1, 23, 3], self.code.consts)
+
+    def test_BINARY_LSHIFT_failure(self):
+        self.code.LOAD_CONST(34)
+        self.assertRaises(AssemblerBytecodeException, self.code.BINARY_LSHIFT)
+
+    def test_BINARY_LSHIFT_instruction(self):
+        self.code.LOAD_CONST(1)
+        self.code.LOAD_CONST(3)
+        self.code.BINARY_LSHIFT()
+
+        self.assertEqual([100, 1, 0, 100, 2, 0, 62], self.code._code_as_list())
+        self.assertEqual(1, self.code.stack_size)
+        self.assertEqual([None, 1, 3], self.code.consts)
+
+    def test_BINARY_RSHIFT_failure(self):
+        self.code.LOAD_CONST(21)
+        self.assertRaises(AssemblerBytecodeException, self.code.BINARY_RSHIFT)
+
+    def test_BINARY_RSHIFT_instruction(self):
+        self.code.LOAD_CONST(53)
+        self.code.LOAD_CONST(2)
+        self.code.BINARY_RSHIFT()
+
+        self.assertEqual([100, 1, 0, 100, 2, 0, 63], self.code._code_as_list())
+        self.assertEqual(1, self.code.stack_size)
+        self.assertEqual([None, 53, 2], self.code.consts)
+
+    def test_BINARY_AND_failure(self):
+        self.code.LOAD_CONST(1)
+        self.assertRaises(AssemblerBytecodeException, self.code.BINARY_AND)
+
+    def test_BINARY_AND_instruction(self):
+        self.code.LOAD_CONST(1)
+        self.code.LOAD_CONST(1)
+        self.code.BINARY_AND()
+
+        self.assertEqual([100, 1, 0, 100, 1, 0, 64], self.code._code_as_list())
+        self.assertEqual(1, self.code.stack_size)
+        self.assertEqual([None, 1], self.code.consts)
+
+    def test_BINARY_XOR_failure(self):
+        self.code.LOAD_CONST(32)
+        self.assertRaises(AssemblerBytecodeException, self.code.BINARY_XOR)
+
+    def test_BINARY_XOR_instruction(self):
+        self.code.LOAD_CONST(13)
+        self.code.LOAD_CONST(12)
+        self.assertEqual(2, self.code.stack_size)
+
+        self.code.BINARY_XOR()
+
+        self.assertEqual([100, 1, 0, 100, 2, 0, 65], self.code._code_as_list())
+        self.assertEqual(1, self.code.stack_size)
+        self.assertEqual([None, 13, 12], self.code.consts)
+
+    def test_INPLACE_POWER_failure(self):
+        self.code.LOAD_CONST(12)
+        self.assertRaises(AssemblerBytecodeException, self.code.INPLACE_POWER)
+
+    def test_INPLACE_POWER_instruction(self):
+        self.code.LOAD_CONST(2)
+        self.code.LOAD_CONST(3)
+        self.assertEqual(2, self.code.stack_size)
+
+        self.code.INPLACE_POWER()
+
+        self.assertEqual([100, 1, 0, 100, 2, 0, 67], self.code._code_as_list())
+        self.assertEqual(1, self.code.stack_size)
+        self.assertEqual([None, 2, 3], self.code.consts)
+
+    def test_GET_ITER_failure(self):
+        self.assertRaises(AssemblerBytecodeException, self.code.GET_ITER)
+
+    def test_GET_ITER_instruction(self):
+        #This doesn't make sense at first place, you can't iterate a number, but we want to test only the stack effect
+        self.code.LOAD_CONST(12)
+        self.code.GET_ITER()
+
+        self.assertEqual([100, 1, 0, 68], self.code._code_as_list())
+        self.assertEqual(1, self.code.stack_size)
+        self.assertEqual([None, 12], self.code.consts)
 
