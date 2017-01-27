@@ -7,15 +7,9 @@ from array import array
 from pyVoodoo.assemblerExceptions import *
 import sys
 import types
-
-
-def listify(gen):
-    "Convert a generator into a function which returns a list"
-
-    def patched(*args, **kwargs):
-        return list(gen(*args, **kwargs))
-
-    return patched
+from .flags import *
+from utils import listify
+from .stackeffects import *
 
 
 class Opcode(tuple):
@@ -55,24 +49,15 @@ hascompare = set(make_opcode(x) for x in opcode.hascompare)
 hasfree = set(make_opcode(x) for x in opcode.hasfree)
 
 COMPILER_FLAG_NAMES = {
-    1: "OPTIMIZED",
-    2: "NEWLOCALS",
-    4: "VARARGS",
-    8: "VARKEYWORDS",
-    16: "NESTED",
-    32: "GENERATOR",
-    64: "NOFREE",
+    CO_OPTIMIZED: "OPTIMIZED",
+    CO_NEWLOCALS: "NEWLOCALS",
+    CO_VARARGS: "VARARGS",
+    CO_VARKEYWORDS: "VARKEYWORDS",
+    CO_NESTED: "NESTED",
+    CO_GENERATOR: "GENERATOR",
+    CO_NOFREE: "NOFREE",
+    CO_GENERATOR_ALLOWED: "GENERATOR_ALLOWED",
 }
-
-# Flags from code.h
-CO_OPTIMIZED = 0x0001  # use LOAD/STORE_FAST instead of _NAME
-CO_NEWLOCALS = 0x0002  # only cleared for module/exec code
-CO_VARARGS = 0x0004
-CO_VARKEYWORDS = 0x0008
-CO_NESTED = 0x0016  # ???
-CO_GENERATOR = 0x0032
-CO_NOFREE = 0x0064  # set if no free or cell vars
-CO_GENERATOR_ALLOWED = 0x0128  # unused
 
 
 def opcode_by_name(name):
@@ -98,41 +83,6 @@ class Persistor(object):
                               instance.co_name, \
                               instance.co_firstlineno, \
                               instance.co_lnotab)
-
-
-class PythonCodeDumper(object):
-    def dump(self, code_object, indent=''):
-        print("%scode" % indent)
-        indent += '   '
-        print("%sargcount %d" % (indent, code_object.co_argcount))
-        print("%snlocals %d" % (indent, code_object.co_nlocals))
-        print("%sstacksize %d" % (indent, code_object.co_stacksize))
-        print("%sflags %04x" % (indent, code_object.co_flags))
-        self.show_hex("code", code_object.co_code, indent=indent)
-        dis.disassemble(code_object)
-        print("%sconsts" % indent)
-        for const in code_object.co_consts:
-            if type(const) == types.CodeType:
-                self.dump(const, indent + '   ')
-            else:
-                print("   %s%r" % (indent, const))
-        print("%snames %r" % (indent, code_object.co_names))
-        print("%svarnames %r" % (indent, code_object.co_varnames))
-        print("%sfreevars %r" % (indent, code_object.co_freevars))
-        print("%scellvars %r" % (indent, code_object.co_cellvars))
-        print("%sfilename %r" % (indent, code_object.co_filename))
-        print("%sname %r" % (indent, code_object.co_name))
-        print("%sfirstlineno %d" % (indent, code_object.co_firstlineno))
-        self.show_hex("lnotab", code_object.co_lnotab, indent=indent)
-
-    def show_hex(self, label, h, indent):
-        h = binascii.hexlify(h)
-        if len(h) < 60:
-            print("%s%s %s" % (indent, label, h))
-        else:
-            print("%s%s" % (indent, label))
-            for i in range(0, len(h), 60):
-                print("%s   %s" % (indent, h[i:i + 60]))
 
 
 class PythonParser(object):
@@ -325,6 +275,7 @@ class Code(object):
 
         return _missing
 
+
 def with_name(f, name):
     try:
         f.__name__ = name
@@ -334,6 +285,7 @@ def with_name(f, name):
             f.func_code, f.func_globals, name, f.func_defaults, f.func_closure
         )
 
+
 for name, value in hasnoargs:
     if not hasattr(Code, name):
         def threat_noargument(self, opname=name):
@@ -341,55 +293,10 @@ for name, value in hasnoargs:
             self.stackchange(tuple(stack_effects[op]))
             self.emit_bytecode(op)
 
+
         setattr(Code, name, threat_noargument)
 
-
-class _se(object):
-    """Quick way of defining static stack effects of opcodes"""
-    POP_TOP = END_FINALLY = POP_JUMP_IF_FALSE = POP_JUMP_IF_TRUE = 1, 0
-    ROT_TWO = 2, 2
-    ROT_THREE = 3, 3
-    ROT_FOUR = 4, 4
-    DUP_TOP = 1, 2
-    DUP_TOP_TWO = 2, 4
-    UNARY_POSITIVE = UNARY_NEGATIVE = UNARY_NOT = UNARY_CONVERT = \
-        UNARY_INVERT = GET_ITER = LOAD_ATTR = IMPORT_FROM = 1, 1
-
-    BINARY_POWER = BINARY_MULTIPLY = BINARY_DIVIDE = BINARY_FLOOR_DIVIDE = \
-        BINARY_TRUE_DIVIDE = BINARY_MODULO = BINARY_ADD = BINARY_SUBTRACT = \
-        BINARY_SUBSCR = BINARY_LSHIFT = BINARY_RSHIFT = BINARY_AND = \
-        BINARY_XOR = BINARY_OR = COMPARE_OP = 2, 1
-
-    INPLACE_POWER = INPLACE_MULTIPLY = INPLACE_DIVIDE = \
-        INPLACE_FLOOR_DIVIDE = INPLACE_TRUE_DIVIDE = INPLACE_MODULO = \
-        INPLACE_ADD = INPLACE_SUBTRACT = INPLACE_LSHIFT = INPLACE_RSHIFT = \
-        INPLACE_AND = INPLACE_XOR = INPLACE_OR = 2, 1
-
-    SLICE_0, SLICE_1, SLICE_2, SLICE_3 = \
-        (1, 1), (2, 1), (2, 1), (3, 1)
-    STORE_SLICE_0, STORE_SLICE_1, STORE_SLICE_2, STORE_SLICE_3 = \
-        (2, 0), (3, 0), (3, 0), (4, 0)
-    DELETE_SLICE_0, DELETE_SLICE_1, DELETE_SLICE_2, DELETE_SLICE_3 = \
-        (1, 0), (2, 0), (2, 0), (3, 0)
-
-    STORE_SUBSCR = 3, 0
-    DELETE_SUBSCR = STORE_ATTR = 2, 0
-    DELETE_ATTR = STORE_DEREF = 1, 0
-    PRINT_EXPR = PRINT_ITEM = PRINT_NEWLINE_TO = IMPORT_STAR = 1, 0
-    RETURN_VALUE = YIELD_VALUE = STORE_NAME = STORE_GLOBAL = STORE_FAST = 1, 0
-    PRINT_ITEM_TO = LIST_APPEND = 2, 0
-
-    LOAD_LOCALS = LOAD_CONST = LOAD_NAME = LOAD_GLOBAL = LOAD_FAST = \
-        LOAD_CLOSURE = LOAD_DEREF = IMPORT_NAME = BUILD_MAP = 0, 1
-
-    EXEC_STMT = BUILD_CLASS = 3, 0
-    JUMP_IF_TRUE = JUMP_IF_FALSE = \
-        JUMP_IF_TRUE_OR_POP = JUMP_IF_FALSE_OR_POP = 1, 1
-
-
-if sys.version >= "2.5":
-    _se.YIELD_VALUE = 1, 1
-
+# stack effects allocation
 stack_effects = [(0, 0)] * 256
 
 for name in opname.values():
@@ -404,11 +311,11 @@ for name in opname.values():
         # Create default method for Code class
         if op >= opcode.HAVE_ARGUMENT:
             def do_op(self, arg, op=op, se=stack_effects[op]):
-                self.stackchange(se);
+                self.stackchange(se)
                 self.emit_arg(op, arg)
         else:
             def do_op(self, op=op, se=stack_effects[op]):
-                self.stackchange(se);
+                self.stackchange(se)
                 self.emit(op)
 
         setattr(Code, name, with_name(do_op, name))
@@ -428,6 +335,7 @@ for op in haslocal:
                 self.co_varnames.append(varname)
             self.emit_arg(op, arg)
 
+
         setattr(Code, opname[op], with_name(do_local, opname[op]))
 
 for op in hasjrel + hasjabs:
@@ -436,6 +344,7 @@ for op in hasjrel + hasjabs:
             self.stackchange(stack_effects[op])
             return self.jump(op, address)
 
+
         setattr(Code, opname[op], with_name(do_jump, opname[op]))
 
-#TODO: PRINT_EXPR should be separated in a separate method, the syntax should be handled in other way different
+        # TODO: PRINT_EXPR should be separated in a separate method, the syntax should be handled in other way different
