@@ -8,7 +8,7 @@ from pyVoodoo.assemblerExceptions import *
 import sys
 import types
 from .flags import *
-from utils import listify
+from .utils import listify
 from .stackeffects import *
 
 
