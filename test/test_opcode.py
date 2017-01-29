@@ -12,7 +12,6 @@ class TestOpcodes(unittest.TestCase):
             self.assertEqual(opcode.code(), op.opmap[opcode.opcode_name()])
             self.assertEqual(opcode.opcode_name(), op.opname[opcode.code()])
 
-
     def test_opcode_table(self):
         for code, name in assembler.opname.items():
             self.assertEqual(name, op.opname[code])
@@ -72,4 +71,3 @@ class TestOpcodes(unittest.TestCase):
 
             self.assertIn(code, op.hasfree)
             self.assertEqual(name, op.opname[code])
-

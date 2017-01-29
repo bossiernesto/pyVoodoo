@@ -9,7 +9,8 @@ import sys
 import types
 from .flags import *
 from .utils import listify
-from .stackeffects import *
+from .codedumper import *
+from .stackeffects import _se
 
 
 class Opcode(tuple):
@@ -320,31 +321,31 @@ for name in opname.values():
 
         setattr(Code, name, with_name(do_op, name))
 
-for op in haslocal:
-    if not hasattr(Code, opname[op]):
-        def do_local(self, varname, op=op):
-            if not self.co_flags & CO_OPTIMIZED:
-                raise AssertionError(
-                    "co_flags must include CO_OPTIMIZED to use fast locals"
-                )
-            self.stackchange(stack_effects[op])
-            try:
-                arg = self.co_varnames.index(varname)
-            except ValueError:
-                arg = len(self.co_varnames)
-                self.co_varnames.append(varname)
-            self.emit_arg(op, arg)
+    if (name, op) in haslocal:
+        if not hasattr(Code, opname[op]):
+            def do_local(self, varname, op=op):
+                if not self.co_flags & CO_OPTIMIZED:
+                    raise AssertionError(
+                        "co_flags must include CO_OPTIMIZED to use fast locals"
+                    )
+                self.stackchange(stack_effects[op])
+                try:
+                    arg = self.co_varnames.index(varname)
+                except ValueError:
+                    arg = len(self.co_varnames)
+                    self.co_varnames.append(varname)
+                self.emit_arg(op, arg)
+
+            setattr(Code, name, with_name(do_local, opname[op]))
+
+    if (name, op) in hasjrel | hasjabs:
+        if not hasattr(Code, opname[op]):
+            def do_jump(self, address=None, op=op):
+                self.stackchange(stack_effects[op])
+                return self.jump(op, address)
 
 
-        setattr(Code, opname[op], with_name(do_local, opname[op]))
-
-for op in hasjrel + hasjabs:
-    if not hasattr(Code, opname[op]):
-        def do_jump(self, address=None, op=op):
-            self.stackchange(stack_effects[op])
-            return self.jump(op, address)
+            setattr(Code, name, with_name(do_jump, opname[op]))
 
 
-        setattr(Code, opname[op], with_name(do_jump, opname[op]))
-
-        # TODO: PRINT_EXPR should be separated in a separate method, the syntax should be handled in other way different
+    # TODO: PRINT_EXPR should be separated in a separate method, the syntax should be handled in other way different

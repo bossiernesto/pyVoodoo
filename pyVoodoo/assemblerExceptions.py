@@ -5,8 +5,10 @@ class AssemblerBytecodeException(Exception):
 class InstructionNotFoundException(AssemblerBytecodeException):
     pass
 
+
 class PersistorException(Exception):
     pass
+
 
 class InexistentInstruction(AssemblerBytecodeException):
     pass

@@ -1,3 +1,5 @@
+import sys
+
 class _se(object):
     """Quick way of defining static stack effects of opcodes"""
     POP_TOP = END_FINALLY = POP_JUMP_IF_FALSE = POP_JUMP_IF_TRUE = 1, 0

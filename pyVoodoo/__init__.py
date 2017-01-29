@@ -1,2 +1,6 @@
-__author__ = 'b03418'
+__author__ = 'ernesto'
+
 from .assemblerExceptions import AssemblerBytecodeException
+from .stackeffects import *
+from .assembler import *
+from .codedumper import *
