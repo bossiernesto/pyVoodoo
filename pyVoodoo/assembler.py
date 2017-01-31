@@ -13,7 +13,7 @@ from .codedumper import *
 from .stackeffects import _se
 
 __all__ = ['opmap', 'opname', 'opcodes', 'cmp_op', 'hasarg', 'hasname', 'hasjrel', 'hasjabs', 'hasjump', 'haslocal',
-           'hascompare', 'hasfree', 'hascode', 'hasflow', 'Opcode', 'Code']
+           'hascompare', 'hasfree', 'hascode', 'hasflow', 'Opcode', 'Code', 'PythonParser']
 
 
 class Opcode(tuple):
@@ -65,18 +65,6 @@ hasflow = opcodes - set([CALL_FUNCTION, CALL_FUNCTION_VAR, CALL_FUNCTION_KW,
                          UNPACK_SEQUENCE, BUILD_SLICE,
                          RAISE_VARARGS, MAKE_FUNCTION, MAKE_CLOSURE])
 hascode = set([MAKE_FUNCTION, MAKE_CLOSURE])
-
-COMPILER_FLAG_NAMES = {
-    CO_OPTIMIZED: "OPTIMIZED",
-    CO_NEWLOCALS: "NEWLOCALS",
-    CO_VARARGS: "VARARGS",
-    CO_VARKEYWORDS: "VARKEYWORDS",
-    CO_NESTED: "NESTED",
-    CO_GENERATOR: "GENERATOR",
-    CO_NOFREE: "NOFREE",
-    CO_GENERATOR_ALLOWED: "GENERATOR_ALLOWED",
-}
-
 
 def opcode_by_name(name):
     try:
