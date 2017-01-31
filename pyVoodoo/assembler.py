@@ -66,6 +66,7 @@ hasflow = opcodes - set([CALL_FUNCTION, CALL_FUNCTION_VAR, CALL_FUNCTION_KW,
                          RAISE_VARARGS, MAKE_FUNCTION, MAKE_CLOSURE])
 hascode = set([MAKE_FUNCTION, MAKE_CLOSURE])
 
+
 def opcode_by_name(name):
     try:
         return opmap[name]
@@ -135,6 +136,14 @@ class PythonParser(object):
 
     def parse(self, code_object):
         pass
+
+
+def is_hashable(value):
+    try:
+        hash(value)
+    except TypeError:
+        return False
+    return True
 
 
 class Code(object):
@@ -225,13 +234,9 @@ class Code(object):
 
     # Instructions...
     def LOAD_CONST(self, const):
-        self.stackchange(tuple(_se.LOAD_CONST))
+        self.stackchange(_se.LOAD_CONST)
         pos = 0
-        hashable = True
-        try:
-            hash(const)
-        except TypeError:
-            hashable = False
+        hashable = is_hashable(const)
         while 1:
             try:
                 arg = self.consts.index(const, pos)
@@ -248,12 +253,12 @@ class Code(object):
         return self.emit_arg('LOAD_CONST', arg)
 
     def RETURN_VALUE(self):
-        self.stackchange(tuple(_se.RETURN_VALUE))
+        self.stackchange(_se.RETURN_VALUE)
         self.emit_bytecode(opmap['RETURN_VALUE'])
         self.stack_unknown()
 
     def LOAD_FAST(self, const_name):
-        self.stackchange(tuple(_se.LOAD_FAST))
+        self.stackchange(_se.LOAD_FAST)
         try:
             arg = self.varnames.index(const_name)
         except ValueError:
@@ -265,7 +270,7 @@ class Code(object):
     LOAD_DEREF = LOAD_FAST
 
     def STORE_FAST(self, const_name):
-        self.stackchange(tuple(_se.STORE_FAST))
+        self.stackchange(_se.STORE_FAST)
         try:
             arg = self.varnames.index(const_name)
         except ValueError:
