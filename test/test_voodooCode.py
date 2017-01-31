@@ -218,6 +218,12 @@ class CodeTest(TestCase):
         self.assertEqual(4, self.code.stack_size)
         self.assertEqual([None, 341, 4828], self.code.consts)
 
+    def test_DUP_TOP_X_instruction(self):
+        self.code.LOAD_CONST(341)
+        self.code.LOAD_CONST(4828)
+
+        self.assertRaises(AssemblerBytecodeException, self.code.DUP_TOPX, 2)
+
     def test_NOP_opcode(self):  # 9
         self.code.NOP()
         self.assertEqual([9], list(self.code.code))

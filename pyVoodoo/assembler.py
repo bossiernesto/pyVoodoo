@@ -12,6 +12,9 @@ from .utils import listify
 from .codedumper import *
 from .stackeffects import _se
 
+__all__ = ['opmap', 'opname', 'opcodes', 'cmp_op', 'hasarg', 'hasname', 'hasjrel', 'hasjabs', 'hasjump', 'haslocal',
+           'hascompare', 'hasfree', 'hascode', 'hasflow', 'Opcode', 'Code']
+
 
 class Opcode(tuple):
     """An int which represents an opcode - has a nicer repr."""
@@ -36,7 +39,16 @@ make_opcode = lambda code: Opcode((opname[code], code))
 
 # CMP
 cmp_op = opcode.cmp_op
+
+
 # make ops global
+def globalize_opcodes():
+    for name, code in opmap.items():
+        globals()[name] = code
+        __all__.append(name)
+
+
+globalize_opcodes()
 
 hasnoargs = set(x for x in sorted(raw_opmap.values()) if x.code() < opcode.HAVE_ARGUMENT)
 hasarg = set(x for x in raw_opmap.values() if x.code() >= opcode.HAVE_ARGUMENT)
@@ -48,6 +60,11 @@ hasjump = hasjrel.union(hasjabs)
 haslocal = set(make_opcode(x) for x in opcode.haslocal)
 hascompare = set(make_opcode(x) for x in opcode.hascompare)
 hasfree = set(make_opcode(x) for x in opcode.hasfree)
+hasflow = opcodes - set([CALL_FUNCTION, CALL_FUNCTION_VAR, CALL_FUNCTION_KW,
+                         CALL_FUNCTION_VAR_KW, BUILD_TUPLE, BUILD_LIST,
+                         UNPACK_SEQUENCE, BUILD_SLICE,
+                         RAISE_VARARGS, MAKE_FUNCTION, MAKE_CLOSURE])
+hascode = set([MAKE_FUNCTION, MAKE_CLOSURE])
 
 COMPILER_FLAG_NAMES = {
     CO_OPTIMIZED: "OPTIMIZED",
@@ -196,20 +213,31 @@ class Code(object):
                 i += 3
 
     def emit_arg(self, op, arg):
+        """
+        Emit argument. Instructions up to python 3.6 are based in 16 bits bytecode instructions
+
+            |--------------|--------------|
+            |    oparg     |    opcode    |
+            |--------------|--------------|
+            0              8              16
+
+        if bytecode is more than 0xFFFF, then the argument actually takes more than just one byte, and we need to split into two bytes instead
+        """
         if not isinstance(op, int):
             op = opcode_by_name(op)
 
         emit = self.emit_bytecode
-        if arg > 0xFFFF:
+        if arg > 0xFFFF:  # oparg is more than just one byte lenght
             emit(opcode.EXTENDED_ARG)
             emit((arg >> 16) & 255)
             emit((arg >> 24) & 255)
         emit(op)
-        emit(arg & 255)
+        emit(arg & 255)  # little endian stuff
         emit((arg >> 8) & 255)
 
+    # Instructions...
     def LOAD_CONST(self, const):
-        self.stackchange((0, 1))
+        self.stackchange(tuple(_se.LOAD_CONST))
         pos = 0
         hashable = True
         try:
@@ -232,7 +260,7 @@ class Code(object):
         return self.emit_arg('LOAD_CONST', arg)
 
     def RETURN_VALUE(self):
-        self.stackchange((1, 0))
+        self.stackchange(tuple(_se.RETURN_VALUE))
         self.emit_bytecode(opmap['RETURN_VALUE'])
         self.stack_unknown()
 
@@ -255,14 +283,81 @@ class Code(object):
         except ValueError:
             arg = len(self.varnames)
             self.varnames.append(const_name)
-        self.emit_arg(opmap['STORE_FAST'], arg)
+        self.emit_arg('STORE_FAST', arg)
+
+    def YIELD_VALUE(self):
+        self.stackchange(_se.YIELD_VALUE)
+        self.co_flags |= CO_GENERATOR
+        return self.emit(opmap['YIELD_VALUE'])
 
     def stackchange(self, *tuple_mod):
         (inputs, outputs) = tuple_mod[0]
         if self._ss is None:
-            raise AssertionError("Unknown stack size at this location")
+            raise CodeTypeException("Unknown stack size at this location")
         self.stack_size -= inputs
         self.stack_size += outputs
+
+    def CALL_FUNCTION(self, argc=0, kwargc=0, op=opmap['CALL_FUNCTION'], extra=0):
+        self.stackchange((1 + argc + 2 * kwargc + extra, 1))
+        self.emit(op)
+        self.emit(argc)
+        self.emit(kwargc)
+
+    def CALL_FUNCTION_VAR(self, argc=0, kwargc=0):
+        self.CALL_FUNCTION(argc, kwargc, opmap['CALL_FUNCTION_VAR'], 1)  # 1 for *args
+
+    def CALL_FUNCTION_KW(self, argc=0, kwargc=0):
+        self.CALL_FUNCTION(argc, kwargc, opmap['CALL_FUNCTION_KW'], 1)  # 1 for **kw
+
+    def CALL_FUNCTION_VAR_KW(self, argc=0, kwargc=0):
+        self.CALL_FUNCTION(argc, kwargc, opmap['CALL_FUNCTION_VAR_KW'], 2)  # 2 *args,**kw
+
+    def ROT_FOUR(self, count):
+        """
+        Not supported anymore. See: http://bugs.python.org/issue9225
+        """
+        raise AssemblerBytecodeException('ROT_FOUR not supported anymore, use ROT_TWO instead')
+
+    def DUP_TOPX(self, count):
+        """
+        Not supported anymore. See: http://bugs.python.org/issue9225
+        """
+        raise AssemblerBytecodeException('DUP_TOPX not supported anymore, use DUP_TOP_TWO instead')
+
+    def _generic_build_type(self, type, count):
+        self.stackchange((count, 1))
+        self.emit_arg('BUILD_{0}'.format(type), count)
+
+    def BUILD_TUPLE(self, count):
+        self._generic_build_type('TUPLE', count)
+
+    def BUILD_LIST(self, count):
+        self._generic_build_type('LIST', count)
+
+    def BUILD_SLICE(self, count):
+        if count in (2, 3):
+            raise AssemblerBytecodeException("Invalid number of arguments for BUILD_SLICE")
+        self._generic_build_type('SLICE', count)
+
+    def UNPACK_SEQUENCE(self, count):
+        self.stackchange((1, count))
+        self.emit_arg('UNPACK_SEQUENCE', count)
+
+    def MAKE_FUNCTION(self, ndefaults):
+        self.stackchange((1 + ndefaults, 1))
+        self.emit_arg('MAKE_FUNCTION', ndefaults)
+
+    def MAKE_CLOSURE(self, ndefaults, freevars):
+        if sys.version >= '2.5':
+            freevars = 1
+        self.stackchange((1 + freevars + ndefaults, 1))
+        self.emit_arg('MAKE_CLOSURE', ndefaults)
+
+    def RAISE_VARARGS(self, argc):
+        if 0 <= argc <= 3:
+            raise AssemblerBytecodeException("Invalid number of arguments for RAISE_VARARGS")
+        self.stackchange((argc, 0))
+        self.emit_arg('RAISE_VARARGS', argc)
 
     def stack_unknown(self):
         self._ss = None
@@ -287,16 +382,6 @@ def with_name(f, name):
         )
 
 
-for name, value in hasnoargs:
-    if not hasattr(Code, name):
-        def threat_noargument(self, opname=name):
-            op = opmap[opname]
-            self.stackchange(tuple(stack_effects[op]))
-            self.emit_bytecode(op)
-
-
-        setattr(Code, name, threat_noargument)
-
 # stack effects allocation
 stack_effects = [(0, 0)] * 256
 
@@ -308,7 +393,8 @@ for name in opname.values():
         # update stack effects table from the _se class
         stack_effects[op] = getattr(_se, name)
 
-    if not hasattr(Code, name):
+    if not hasattr(Code, opname[op]):
+
         # Create default method for Code class
         if op >= opcode.HAVE_ARGUMENT:
             def do_op(self, arg, op=op, se=stack_effects[op]):
@@ -321,8 +407,16 @@ for name in opname.values():
 
         setattr(Code, name, with_name(do_op, name))
 
-    if (name, op) in haslocal:
-        if not hasattr(Code, opname[op]):
+        if (name, op) in hasnoargs:
+            def treat_noargument(self, opname=name):
+                op = opmap[opname]
+                self.stackchange(stack_effects[op])
+                self.emit_bytecode(op)
+
+
+            setattr(Code, name, treat_noargument)
+
+        if (name, op) in haslocal:
             def do_local(self, varname, op=op):
                 if not self.co_flags & CO_OPTIMIZED:
                     raise AssertionError(
@@ -336,16 +430,14 @@ for name in opname.values():
                     self.co_varnames.append(varname)
                 self.emit_arg(op, arg)
 
+
             setattr(Code, name, with_name(do_local, opname[op]))
 
-    if (name, op) in hasjrel | hasjabs:
-        if not hasattr(Code, opname[op]):
+        if (name, op) in hasjrel | hasjabs:
             def do_jump(self, address=None, op=op):
                 self.stackchange(stack_effects[op])
                 return self.jump(op, address)
 
 
             setattr(Code, name, with_name(do_jump, opname[op]))
-
-
-    # TODO: PRINT_EXPR should be separated in a separate method, the syntax should be handled in other way different
+            # TODO: PRINT_EXPR should be separated in a separate method, the syntax should be handled in other way different

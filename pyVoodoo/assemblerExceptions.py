@@ -12,3 +12,7 @@ class PersistorException(Exception):
 
 class InexistentInstruction(AssemblerBytecodeException):
     pass
+
+
+class CodeTypeException(Exception):
+    pass
