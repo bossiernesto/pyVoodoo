@@ -23,3 +23,5 @@ ratings:
   - "**.rb"
 exclude_paths:
 - test/
+exclude_fingerprints:
+- a60dbd1c871fdb2f449fe805a822f0e0
